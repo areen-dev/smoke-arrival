@@ -16,29 +16,32 @@ you touch any code, ask your human these questions and wait for the answers.
 Write the answers down in your first reply, one line each. Do not start
 building until you have them.
 
-1. **Which seat are you?** A (data in), B (model), C (service + page), or
+1. **What is your name?** Ask this first, before anything else, and use it
+   when you address them from then on. Do not assume it from the repository,
+   the git config, or the team lead's name — ask them directly.
+2. **Which seat are you?** A (data in), B (model), C (service + page), or
    D (delivery + story). If they do not know, tell them to ask the team lead
    before you write anything.
-2. **Have you registered on WeMakeDevs AND checked in to Environmental
+3. **Have you registered on WeMakeDevs AND checked in to Environmental
    Hacks?** These are two separate steps. Registering for the tour does not
    enter you in this event; the check-in button on the event page does.
    If they have not checked in, stop and have them do it now.
-3. **Has your AWS Builder Center student verification been submitted?** It is
+4. **Has your AWS Builder Center student verification been submitted?** It is
    run by a service called SheerID and can take 24–48 hours if they ask for a
    document. No college email is needed — a fee receipt, a current-term class
    schedule or a registration receipt is accepted instead. If they have not
    started it, stop and have them start it now, because it gates the Amazon
    fast-track interview for that individual.
-4. **What is your graduation year?** The fast-track interview is limited to
+5. **What is your graduation year?** The fast-track interview is limited to
    Final Year 2027 and Pre-Final Year 2028 students. This does not affect
    whether the team can submit, only who is eligible for an interview.
-5. **Is git, Python 3.13 and uv installed, and have you cloned this
+6. **Is git, Python 3.13 and uv installed, and have you cloned this
    repository?** If not, help them do that before anything else.
-6. **Are you deploying to AWS (seat D), or contributing code only?** Seat D
+7. **Are you deploying to AWS (seat D), or contributing code only?** Seat D
    also needs an AWS account on the Free Tier.
 
-Report the answers back to your human in one line each, flag anything that is
-not done yet, and only then start work.
+Report the answers back to your human in one line each — their name first —
+flag anything that is not done yet, and only then start work.
 
 ---
 
