@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smoke Arrival</title>
+<meta name="description" content="Forecasts when smoke from stubble burning in Punjab and Haryana reaches your city, from NASA satellite fire data and forecast wind.">
+<link rel="stylesheet" href="/static/vendor/leaflet/css/leaflet.css">
+<style>
+  :root {
+    --paper: #edefee;
+    --panel: #f8f9f8;
+    --ink: #1c2b36;
+    --muted: #55646d;
+    --line: #cdd4d7;
+    --ember: #e4572e;
+    --b-clear: #4f9a8c;
+    --b-low: #c9b04a;
+    --b-moderate: #e0922f;
+    --b-high: #c4512b;
+    --b-severe: #7a1f3d;
+    --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font: 15px/1.5 var(--sans);
+    color: var(--ink);
+    background: var(--paper);
+    height: 100dvh;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid #1d6fd1; outline-offset: 2px; }
+
+  /* ---------- top bar ---------- */
+  .top {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px;
+    padding: 12px 20px; background: var(--ink); color: #f3f5f5;
+  }
+  .brand { font: 600 22px/1 var(--serif); letter-spacing: .01em; margin: 0; }
+  .tagline { margin: 0; color: #c9d3d8; flex: 1 1 280px; }
+  .made { margin: 0; color: #c9d3d8; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .sample {
+    margin: 0; padding: 8px 20px; background: #f6e3b4; color: #4a3500;
+    border-bottom: 1px solid #d9bd72; font-size: 14px;
+  }
+  .sample[hidden] { display: none; }
+
+  /* ---------- layout ---------- */
+  .main { display: grid; grid-template-columns: minmax(0, 1fr) 440px; min-height: 0; }
+  .mapwrap { position: relative; min-height: 0; background: #dfe5e7; }
+  #map { position: absolute; inset: 0; background: #dfe5e7; }
+  .legend {
+    position: absolute; left: 12px; bottom: 26px; z-index: 500; max-width: min(360px, calc(100% - 24px));
+    background: rgba(248, 249, 248, .94); border: 1px solid var(--line); border-radius: 6px;
+    padding: 8px 10px; font-size: 13px; color: var(--muted); pointer-events: none;
+  }
+  .legend b { color: var(--ink); font-weight: 600; }
+  .legend i {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--ember); opacity: .8; vertical-align: -1px; margin-right: 4px;
+  }
+  .panel { overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); padding-bottom: 28px; }
+
+  /* ---------- arrival board ---------- */
+  .board { list-style: none; margin: 0; padding: 0; border-bottom: 1px solid var(--line); }
+  .board li + li { border-top: 1px solid var(--line); }
+  .row {
+    display: grid; grid-template-columns: 14px minmax(0, 1fr) auto auto; align-items: center; gap: 0 12px;
+    width: 100%; min-height: 44px; padding: 5px 20px; background: transparent; border: 0;
+    border-left: 4px solid transparent; text-align: left; cursor: pointer;
+  }
+  .row:hover { background: #eef1f0; }
+  .row[aria-pressed="true"] { background: #e6ebea; border-left-color: var(--ink); }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--c); border: 2px solid var(--ink); }
+  .nm { font-weight: 600; }
+  .when { font-variant-numeric: tabular-nums; color: var(--ink); text-align: right; }
+  .when small { display: block; color: var(--muted); font-size: 12px; line-height: 1.2; }
+  .when.none { color: var(--muted); }
+  .pill {
+    min-width: 82px; text-align: center; padding: 2px 8px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    color: var(--ink); border: 1px solid var(--c);
+    background: color-mix(in srgb, var(--c) 24%, #fff);
+  }
+
+  /* ---------- city detail ---------- */
+  .detail { padding: 20px 20px 0; }
+  .lead { margin: 0; color: var(--muted); font-size: 16px; }
+  .big {
+    margin: 2px 0 0; font: 700 40px/1.1 var(--sans); letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+  }
+  .after { margin: 4px 0 0; color: var(--muted); }
+  .explain {
+    margin: 16px 0 0; padding: 2px 0 2px 14px; border-left: 4px solid var(--c); font-size: 16px; line-height: 1.5; max-width: 62ch;
+  }
+  .ruler { margin-top: 22px; }
+  .ruler svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .ruler p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; margin: 22px 0 0; }
+  .stats div { min-width: 0; }
+  .stats dt { font-size: 13px; color: var(--muted); }
+  .stats dd { margin: 0; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stats dd small { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .stats .wide { grid-column: 1 / -1; }
+  .meter { position: relative; height: 12px; margin: 8px 0 2px; border-radius: 6px; overflow: visible;
+    background: linear-gradient(90deg,
+      color-mix(in srgb, var(--b-low) 55%, #fff) 0 15%,
+      color-mix(in srgb, var(--b-moderate) 55%, #fff) 15% 40%,
+      color-mix(in srgb, var(--b-high) 55%, #fff) 40% 70%,
+      color-mix(in srgb, var(--b-severe) 55%, #fff) 70% 100%); }
+  .meter .at {
+    position: absolute; top: -4px; width: 4px; height: 20px; margin-left: -2px; background: var(--ink);
+    border-radius: 2px; box-shadow: 0 0 0 2px var(--panel);
+  }
+  .meter-scale { position: relative; height: 16px; font-size: 12px; color: var(--muted); }
+  .meter-scale span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .meter-note { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+  h3 { margin: 26px 0 6px; font-size: 16px; }
+  .sources { list-style: none; margin: 0; padding: 0; }
+  .src {
+    display: block; width: 100%; padding: 8px 10px; margin: 0 -10px; width: calc(100% + 20px); text-align: left;
+    background: transparent; border: 0; border-radius: 6px; cursor: pointer;
+  }
+  .src:hover, .src[aria-pressed="true"] { background: #e6ebea; }
+  .src b { font-weight: 600; }
+  .src span { display: block; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .src .bar { height: 4px; margin-top: 5px; border-radius: 2px; background: var(--c); opacity: .75; }
+  .foot { margin: 26px 20px 0; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .foot p { margin: 0 0 8px; max-width: 62ch; }
+  .msg { padding: 28px 20px; }
+  .msg h2 { margin: 0 0 6px; font-size: 18px; }
+
+  /* ---------- map details ---------- */
+  .city-label { background: none; border: 0; box-shadow: none; padding: 0; font: 600 13px var(--sans); color: var(--ink);
+    text-shadow: -1px 0 #fff, 1px 0 #fff, 0 -1px #fff, 0 1px #fff, 0 0 4px #fff; }
+  .city-label::before { display: none; }
+  .leaflet-container { font-family: var(--sans); }
+  /* Mute the street map so the fire circles and smoke paths are what the eye lands on. */
+  .leaflet-tile-pane { filter: grayscale(1) contrast(.9) brightness(1.08); }
+
+  /* ---------- narrow screens ---------- */
+  @media (max-width: 900px) {
+    body { height: auto; display: block; }
+    .main { display: block; }
+    .mapwrap { height: 52vh; min-height: 300px; }
+    .panel { border-left: 0; overflow: visible; }
+    .big { font-size: 34px; }
+    .legend { font-size: 12px; padding: 6px 8px; bottom: 22px; }
+  }
+  @media (max-width: 420px) {
+    .row { padding-left: 14px; padding-right: 14px; gap: 0 8px; }
+    .pill { min-width: 70px; }
+    .detail { padding-left: 14px; padding-right: 14px; }
+    .foot { margin-left: 14px; margin-right: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+</style>
+</head>
+<body>
+  <header class="top">
+    <h1 class="brand">Smoke Arrival</h1>
+    <p class="tagline">When will smoke from stubble burning in Punjab and Haryana reach your city?</p>
+    <p class="made" id="made"></p>
+  </header>
+  <p class="sample" id="sample" hidden></p>
+
+  <div class="main">
+    <section class="mapwrap" aria-label="Map of fires and forecast smoke paths">
+      <div id="map" role="img" aria-label="Map showing satellite-detected fires and the paths smoke is forecast to take toward the selected city"></div>
+      <div class="legend"><i></i><b>Orange circles</b> are fires seen by satellite in the last 24 hours; larger means hotter. <b>Lines</b> show where the wind carries their smoke.</div>
+    </section>
+
+    <aside class="panel" id="panel" aria-live="polite">
+      <div class="msg"><h2>Loading forecast</h2><p>Fetching fire detections and wind.</p></div>
+    </aside>
+  </div>
+
+  <script src="/static/vendor/leaflet/js/leaflet.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    var IST = 'Asia/Kolkata';
+    var COLORS = { clear: '#4f9a8c', low: '#c9b04a', moderate: '#e0922f', high: '#c4512b', severe: '#7a1f3d' };
+    var INK = '#1c2b36';
+    var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    var state = { data: null, radius: {}, selected: null, source: null, usedSample: false };
+    var map, fireLayer, pathLayer, ringLayer, cityLayer, cityMarkers = {};
+
+    /* ---------- tiny DOM helpers ---------- */
+    function h(tag, props) {
+      var el = document.createElement(tag), kids = Array.prototype.slice.call(arguments, 2);
+      Object.keys(props || {}).forEach(function (k) {
+        var v = props[k];
+        if (k === 'class') el.className = v;
+        else if (k === 'style') el.style.cssText = v;
+        else if (k.indexOf('on') === 0) el.addEventListener(k.slice(2), v);
+        else if (v !== false && v != null) el.setAttribute(k, v === true ? '' : v);
+      });
+      kids.flat(Infinity).forEach(function (kid) {
+        if (kid == null || kid === false) return;
+        el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+      });
+      return el;
+    }
+    function svg(tag, attrs, text) {
+      var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      Object.keys(attrs || {}).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+      if (text != null) el.textContent = text;
+      return el;
+    }
+
+    /* ---------- time formatting (always India time) ---------- */
+    function parts(d, opts) {
+      var o = {};
+      new Intl.DateTimeFormat('en-US', Object.assign({ timeZone: IST }, opts)).formatToParts(d)
+        .forEach(function (p) { o[p.type] = p.value; });
+      return o;
+    }
+    function clock(d) {
+      var p = parts(d, { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
+      return p.weekday + ' ' + p.hour + ':' + p.minute + ' ' + String(p.dayPeriod).toLowerCase();
+    }
+    function dayLabel(d) {
+      var p = parts(d, { weekday: 'short', day: 'numeric', month: 'short' });
+      return p.weekday + ' ' + p.day + ' ' + p.month;
+    }
+    function hoursWord(n) { n = Math.max(1, Math.round(n)); return n + (n === 1 ? ' hour' : ' hours'); }
+
+    /* ---------- data ---------- */
+    function getJSON(url) {
+      return fetch(url, { headers: { Accept: 'application/json' } }).then(function (r) {
+        if (!r.ok) throw new Error(url + ' returned ' + r.status);
+        return r.json();
+      });
+    }
+    function isSample(d) { return /^SAMPLE DATA/.test(d.model_note || ''); }
+    function restampSample(d) {
+      // Sample data is a fixed file. Move its clock to now so the page reads like a live forecast.
+      var now = Date.now(), gen = new Date(d.generated_at).getTime();
+      if (now - gen < 3600e3) return;
+      d.generated_at = new Date(now).toISOString();
+      d.cities.forEach(function (c) {
+        if (c.first_arrival_hours != null) c.first_arrival_at = new Date(now + c.first_arrival_hours * 3600e3).toISOString();
+      });
+    }
+    function load() {
+      var forceSample = /[?&]sample\b/.test(location.search);
+      var forecast = forceSample ? getJSON('/static/mock/forecast.json') : getJSON('/api/forecast').catch(function () {
+        state.usedSample = true;
+        return getJSON('/static/mock/forecast.json');
+      });
+      return forecast.then(function (d) {
+        if (isSample(d)) restampSample(d);
+        state.data = d;
+        return getJSON('/api/cities').then(function (c) {
+          c.cities.forEach(function (x) { state.radius[x.key] = x.radius_km; });
+        }).catch(function () {});
+      });
+    }
+
+    /* ---------- derived facts ---------- */
+    function genDate() { return new Date(state.data.generated_at); }
+    function arrivalDate(c) {
+      return c.first_arrival_at ? new Date(c.first_arrival_at) : new Date(genDate().getTime() + c.first_arrival_hours * 3600e3);
+    }
+    function kind(c) { return c.first_arrival_hours != null ? 'arriving' : (c.local_fire_cells > 0 ? 'local' : 'clear'); }
+    function sortedCities() {
+      var order = { arriving: 0, local: 1, clear: 2 };
+      return state.data.cities.slice().sort(function (a, b) {
+        var ka = order[kind(a)], kb = order[kind(b)];
+        if (ka !== kb) return ka - kb;
+        if (ka === 0) return a.first_arrival_hours - b.first_arrival_hours;
+        return a.name.localeCompare(b.name);
+      });
+    }
+    function bandOf(c) { return kind(c) === 'arriving' ? c.band : 'clear'; }
+    function cityByKey(k) { return state.data.cities.filter(function (c) { return c.city === k; })[0]; }
+    function fromNowPhrase(hours) {
+      var age = (Date.now() - genDate().getTime()) / 3600e3;
+      if (age < 2) return 'about ' + hoursWord(Math.max(1, hours - age)) + ' from now';
+      return 'about ' + hoursWord(hours) + ' after this forecast was made';
+    }
+
+    /* ---------- map ---------- */
+    function initMap() {
+      L.Icon.Default.imagePath = '/static/vendor/leaflet/images/';
+      map = L.map('map', { minZoom: 5, maxZoom: 10, zoomSnap: 0.5 }).setView([29.6, 76.6], 7);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+      fireLayer = L.layerGroup().addTo(map);
+      ringLayer = L.layerGroup().addTo(map);
+      pathLayer = L.layerGroup().addTo(map);
+      cityLayer = L.layerGroup().addTo(map);
+      if (window.ResizeObserver) new ResizeObserver(function () { map.invalidateSize(); }).observe(document.getElementById('map'));
+    }
+    function drawFires() {
+      fireLayer.clearLayers();
+      var cells = (state.data.sources.heatmap || []).slice().sort(function (a, b) { return b.frp - a.frp; });
+      cells.forEach(function (c) {
+        var r = Math.min(3 + 1.15 * Math.sqrt(c.frp), 20);
+        L.circleMarker([c.lat, c.lon], { radius: r, stroke: true, color: '#b8381a', weight: 1, fillColor: '#e4572e', fillOpacity: 0.5 })
+          .bindTooltip('Fire cluster near ' + c.lat.toFixed(2) + '°N, ' + c.lon.toFixed(2) + '°E<br>' +
+            Math.round(c.frp) + ' MW fire power, ' + c.detections + ' detections<br>latest ' + c.newest + ' UTC')
+          .addTo(fireLayer);
+      });
+    }
+    function drawCities() {
+      cityLayer.clearLayers(); cityMarkers = {};
+      state.data.cities.forEach(function (c) {
+        var m = L.circleMarker([c.lat, c.lon], {
+          radius: 9, color: INK, weight: 3, fillColor: COLORS[bandOf(c)], fillOpacity: 1, className: 'city-dot'
+        }).addTo(cityLayer);
+        var side = { delhi: ['top', [0, -10]], gurugram: ['left', [-10, 0]], noida: ['bottom', [0, 10]] }[c.city] || ['right', [10, 0]];
+        m.bindTooltip(c.name, { permanent: true, direction: side[0], offset: side[1], className: 'city-label' });
+        m.on('click', function () { select(c.city); });
+        cityMarkers[c.city] = m;
+      });
+    }
+    function drawSelection() {
+      var c = cityByKey(state.selected);
+      ringLayer.clearLayers(); pathLayer.clearLayers();
+      if (!c) return;
+      var col = COLORS[bandOf(c)];
+      if (state.radius[c.city]) {
+        L.circle([c.lat, c.lon], { radius: state.radius[c.city] * 1000, color: INK, weight: 1.5, dashArray: '4 4', fill: false })
+          .addTo(ringLayer);
+      }
+      var max = Math.max.apply(null, c.arrivals.map(function (a) { return a.contribution; }).concat([1]));
+      c.arrivals.forEach(function (a, i) {
+        var on = state.source === i;
+        if (state.source != null && !on) return;
+        L.polyline(a.path, {
+          color: on ? INK : col, weight: on ? 4 : 1.5 + 3 * Math.sqrt(a.contribution / max),
+          opacity: on ? 0.95 : 0.35 + 0.5 * (a.contribution / max), lineCap: 'round'
+        }).addTo(pathLayer);
+      });
+      if (cityMarkers[c.city]) cityMarkers[c.city].bringToFront();
+    }
+    function fitSelection() {
+      var c = cityByKey(state.selected);
+      if (!c) return;
+      map.invalidateSize();
+      var pts = [[c.lat, c.lon]];
+      c.arrivals.slice(0, 6).forEach(function (a) { pts.push([a.source_lat, a.source_lon]); });
+      var opts = { padding: [50, 50], maxZoom: 8, animate: !reduceMotion };
+      if (pts.length === 1) map.setView(pts[0], 8, { animate: !reduceMotion });
+      else map.fitBounds(L.latLngBounds(pts), opts);
+    }
+
+    /* ---------- panel ---------- */
+    function renderBoard() {
+      return h('ul', { class: 'board', 'aria-label': 'Cities, soonest smoke first' },
+        sortedCities().map(function (c) {
+          var k = kind(c), b = bandOf(c), when;
+          if (k === 'arriving') {
+            when = h('span', { class: 'when' }, clock(arrivalDate(c)), h('small', null, 'in ' + hoursWord(c.first_arrival_hours)));
+          } else if (k === 'local') {
+            when = h('span', { class: 'when none' }, 'Local fires only');
+          } else {
+            when = h('span', { class: 'when none' }, 'No smoke expected');
+          }
+          return h('li', null, h('button', {
+            class: 'row', type: 'button', 'data-city': c.city, style: '--c:' + COLORS[b],
+            'aria-pressed': String(c.city === state.selected), onclick: function () { select(c.city); }
+          },
+            h('span', { class: 'dot', 'aria-hidden': 'true' }),
+            h('span', { class: 'nm' }, c.name),
+            when,
+            h('span', { class: 'pill' }, b)));
+        }));
+    }
+
+    function renderRuler(c) {
+      var W = 380, H = 112, pad = 8, base = 68, hrs = 48;
+      var x = function (hr) { return pad + (hr / hrs) * (W - 2 * pad); };
+      var el = svg('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img',
+        'aria-label': 'Hour by hour arrivals over the next 48 hours; first smoke at ' + clock(arrivalDate(c)) });
+      var gen = genDate().getTime(), col = COLORS[bandOf(c)];
+
+      // IST midnights
+      var ist = gen + 19800e3, nextMid = Math.ceil(ist / 86400e3) * 86400e3;
+      for (var hr = (nextMid - ist) / 3600e3; hr < hrs; hr += 24) {
+        el.append(svg('line', { x1: x(hr), x2: x(hr), y1: 24, y2: base + 36, stroke: '#9aa7ad', 'stroke-width': 1, 'stroke-dasharray': '2 3' }));
+        el.append(svg('text', { x: x(hr) + (x(hr) > W - 80 ? -4 : 4), y: base + 46, 'font-size': 11, fill: '#55646d', 'text-anchor': x(hr) > W - 80 ? 'end' : 'start' }, dayLabel(new Date(gen + hr * 3600e3))));
+      }
+      el.append(svg('line', { x1: pad, x2: W - pad, y1: base, y2: base, stroke: INK, 'stroke-width': 1.5 }));
+      [0, 12, 24, 36, 48].forEach(function (t) {
+        el.append(svg('line', { x1: x(t), x2: x(t), y1: base, y2: base + 5, stroke: INK, 'stroke-width': 1 }));
+        var txt = t === 0 ? 'forecast' : '+' + t + ' h';
+        var anchor = t === 0 ? 'start' : (t === 48 ? 'end' : 'middle');
+        el.append(svg('text', { x: x(t), y: base + 20, 'font-size': 11, fill: '#55646d', 'text-anchor': anchor }, txt));
+      });
+
+      // hourly bars
+      var bins = {};
+      c.arrivals.forEach(function (a) { var k = Math.round(a.arrival_hour); bins[k] = (bins[k] || 0) + a.contribution; });
+      var top = Math.max.apply(null, Object.keys(bins).map(function (k) { return bins[k]; }).concat([1]));
+      Object.keys(bins).forEach(function (k) {
+        var ht = 6 + 34 * Math.sqrt(bins[k] / top);
+        el.append(svg('rect', { x: x(+k) - 3, y: base - ht, width: 6, height: ht, rx: 1.5, fill: col, opacity: 0.9, stroke: INK, 'stroke-width': 0.75 }));
+      });
+
+      // first arrival marker
+      var fx = x(c.first_arrival_hours), label = clock(arrivalDate(c));
+      var anchor2 = fx > W - 120 ? 'end' : 'start';
+      el.append(svg('line', { x1: fx, x2: fx, y1: 20, y2: base, stroke: INK, 'stroke-width': 2 }));
+      el.append(svg('text', { x: fx + (anchor2 === 'end' ? -5 : 5), y: 14, 'font-size': 12, 'font-weight': 700, fill: INK, 'text-anchor': anchor2 }, 'first smoke ' + label));
+      return el;
+    }
+
+    function renderMeter(c) {
+      var idx = Math.max(0, Math.min(100, c.smoke_load_index));
+      return h('div', null,
+        h('div', { class: 'meter', role: 'img', 'aria-label': 'Smoke load ' + idx + ' out of 100, ' + c.band },
+          h('span', { class: 'at', style: 'left:' + idx + '%' })),
+        h('div', { class: 'meter-scale', 'aria-hidden': 'true' },
+          h('span', { style: 'left:7.5%' }, 'low'), h('span', { style: 'left:27.5%' }, 'moderate'),
+          h('span', { style: 'left:55%' }, 'high'), h('span', { style: 'left:85%' }, 'severe')));
+    }
+
+    function renderDetail() {
+      var c = cityByKey(state.selected), k = kind(c), col = COLORS[bandOf(c)];
+      var head;
+      if (k === 'arriving') {
+        head = [h('p', { class: 'lead' }, 'Smoke reaches ' + c.name),
+          h('p', { class: 'big' }, clock(arrivalDate(c))),
+          h('p', { class: 'after' }, fromNowPhrase(c.first_arrival_hours))];
+      } else if (k === 'local') {
+        head = [h('p', { class: 'lead' }, c.name), h('p', { class: 'big' }, 'No smoke arriving'),
+          h('p', { class: 'after' }, 'in the next 48 hours')];
+      } else {
+        head = [h('p', { class: 'lead' }, c.name), h('p', { class: 'big' }, 'Clear for 48 hours'),
+          h('p', { class: 'after' }, 'no smoke is forecast to arrive')];
+      }
+
+      var kids = [].concat(head, [h('p', { class: 'explain', style: '--c:' + col }, c.explain)]);
+
+      if (k === 'arriving') {
+        var hrs = c.arrivals.map(function (a) { return a.arrival_hour; });
+        var lo = Math.min.apply(null, hrs), hi = Math.max.apply(null, hrs);
+        kids.push(h('div', { class: 'ruler' }, renderRuler(c),
+          h('p', null, 'Each bar is smoke arriving in that hour. The largest sources arrive between ' + Math.round(lo) + ' and ' + Math.round(hi) + ' hours after the forecast.')));
+      }
+
+      var stats = [];
+      if (k === 'arriving') {
+        stats.push(h('div', { class: 'wide' }, h('dt', null, 'Smoke load'),
+          h('dd', null, c.smoke_load_index.toFixed(0), ' ', h('small', null, 'out of 100, ' + c.band)),
+          renderMeter(c),
+          h('p', { class: 'meter-note' }, 'A relative score for comparing days and cities. It is not a pollution reading.')));
+        stats.push(h('div', null, h('dt', null, 'Fire clusters sending smoke'), h('dd', null, c.arriving_sources)));
+      }
+      if (c.local_fire_cells > 0) {
+        stats.push(h('div', null, h('dt', null, 'Burning inside the city area'),
+          h('dd', null, c.local_fire_cells, ' ', h('small', null, 'counted separately'))));
+      }
+      stats.push(h('div', null, h('dt', null, 'Nearest fire cluster'), h('dd', null, Math.round(c.nearest_source_km), ' ', h('small', null, 'km'))));
+      kids.push(h('dl', { class: 'stats' }, stats));
+
+      if (c.arrivals.length) {
+        var max = Math.max.apply(null, c.arrivals.map(function (a) { return a.contribution; }));
+        kids.push(h('h3', null, 'Where the smoke comes from'));
+        kids.push(h('ul', { class: 'sources' }, c.arrivals.slice(0, 5).map(function (a, i) {
+          var when = clock(new Date(genDate().getTime() + a.arrival_hour * 3600e3));
+          return h('li', null, h('button', {
+            class: 'src', type: 'button', style: '--c:' + col, 'aria-pressed': String(state.source === i),
+            onclick: function () { state.source = state.source === i ? null : i; drawSelection(); renderPanel(true); }
+          },
+            h('b', null, 'Fires near ' + a.source_lat.toFixed(1) + '°N, ' + a.source_lon.toFixed(1) + '°E'),
+            h('span', null, Math.round(a.travel_km) + ' km away, arrives ' + when),
+            h('div', { class: 'bar', style: 'width:' + Math.max(6, 100 * a.contribution / max) + '%' }))
+          );
+        })));
+      }
+      return h('div', { class: 'detail' }, kids);
+    }
+
+    function renderFoot() {
+      var d = state.data, s = d.sources;
+      return h('div', { class: 'foot' },
+        h('p', null, d.model_note),
+        h('p', null, 'Based on ' + s.cells + ' fire clusters (' + s.raw_detections + ' satellite detections) from the last ' + d.window.replace('h', ' hours') +
+          '. Fire data: NASA FIRMS. Wind: Open-Meteo, ' + d.wind.height_m + ' m above ground.'));
+    }
+
+    function renderPanel(keepScroll) {
+      var panel = document.getElementById('panel'), y = panel.scrollTop;
+      panel.replaceChildren(renderBoard(), renderDetail(), renderFoot());
+      if (keepScroll) panel.scrollTop = y;
+    }
+
+    function select(key) {
+      state.selected = key; state.source = null;
+      try { history.replaceState(null, '', '#' + key); } catch (e) {}
+      renderPanel(false);
+      document.getElementById('panel').scrollTop = 0;
+      drawSelection(); fitSelection();
+    }
+
+    function renderHeader() {
+      var d = state.data;
+      document.getElementById('made').textContent = 'Forecast made ' + clock(genDate()) + ' IST, covers the next 48 hours';
+      var sample = document.getElementById('sample');
+      if (isSample(d)) {
+        sample.hidden = false;
+        sample.textContent = state.usedSample
+          ? 'Sample data. The live forecast could not be reached, so these fires and winds are invented placeholders.'
+          : 'Sample data. These fires and winds are invented placeholders, not a real forecast.';
+      } else sample.hidden = true;
+    }
+
+    function fail(err) {
+      if (window.console) console.error(err);
+      document.getElementById('panel').replaceChildren(h('div', { class: 'msg' },
+        h('h2', null, 'The forecast could not be loaded'),
+        h('p', null, 'Check your connection and refresh the page. If it keeps happening, the forecast service may be down.')));
+    }
+
+    initMap();
+    load().then(function () {
+      renderHeader(); drawFires(); drawCities();
+      var want = decodeURIComponent((location.hash || '').slice(1));
+      var start = cityByKey(want) ? want : (cityByKey('delhi') ? 'delhi' : sortedCities()[0].city);
+      select(start);
+    }).catch(fail);
+  })();
+  </script>
+</body>
+</html>
