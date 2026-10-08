@@ -519,6 +519,16 @@ fire.
    that the judged moment does not depend on a third party being up.
 9. **Compute on demand, not on a schedule.** Generate the forecast on
    request with a 15-minute cache. No cron, no queue, no database.
+10. **Cache the last good forecast, and serve it if a live fetch fails.**
+    The FIRMS and Open-Meteo calls happen at the moment a judge opens the
+    page. Save the last successful payload to a file, and fall back to it
+    rather than showing an error. The page then always shows real data,
+    even if the data source is having a bad day. Leaflet is already
+    vendored so that risk is gone; this covers the data.
+    Not fixable the same way: the CARTO map tiles, which are millions of
+    individual images. If CARTO is down the map background goes blank, but
+    the fire circles, forecast lines and city list still render, because
+    those come from our own code.
 
 ---
 

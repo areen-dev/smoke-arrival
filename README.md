@@ -38,6 +38,13 @@ uv pip install --python .venv/bin/python -r requirements.txt
 .venv/bin/python -m pytest tests -q
 ```
 
+## Cost
+
+Runs inside the AWS Free Tier. Lambda gives 1 million requests and 400,000
+GB-seconds of compute per month, and CloudWatch gives 10 custom metrics and
+10 alarms — both always-free allowances, not a trial. No database, no queue,
+no storage, so nothing else is billed.
+
 ## Credits and licences
 
 - Leaflet 1.9.4 — BSD 2-Clause, vendored at `static/vendor/leaflet/`
