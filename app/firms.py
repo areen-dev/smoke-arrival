@@ -43,7 +43,7 @@ def _parse_csv(text: str, sensor: str) -> list[Fire]:
         raise ValueError(f"Unexpected FIRMS CSV columns for {sensor}")
 
     for row in reader:
-        confidence: str | int | float = row["confidence"].strip()
+        confidence: str | int | float = (row.get("confidence") or "").strip()
         if not _confidence_allowed(sensor, confidence):
             continue
         try:
@@ -80,8 +80,8 @@ def _deduplicate(fires: Iterable[Fire]) -> list[Fire]:
         if old is None:
             by_key[key] = fire
             continue
-        old_rank = confidence_rank.get(str(old.confidence).lower(), 3)
-        new_rank = confidence_rank.get(str(fire.confidence).lower(), 3)
+        old_rank = confidence_rank.get(str(old.confidence).lower(), 0)
+        new_rank = confidence_rank.get(str(fire.confidence).lower(), 0)
         if (new_rank, fire.frp) > (old_rank, old.frp):
             by_key[key] = fire
     return list(by_key.values())
@@ -114,3 +114,4 @@ def in_source_region(fires: Iterable[Fire]) -> list[Fire]:
         if SOURCE_BBOX["min_lat"] <= fire.lat <= SOURCE_BBOX["max_lat"]
         and SOURCE_BBOX["min_lon"] <= fire.lon <= SOURCE_BBOX["max_lon"]
     ]
+
