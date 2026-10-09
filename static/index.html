@@ -513,6 +513,11 @@
         sample.textContent = state.usedSample
           ? 'Sample data. The live forecast could not be reached, so these fires and winds are invented placeholders.'
           : 'Sample data. These fires and winds are invented placeholders, not a real forecast.';
+      } else if ((Date.now() - genDate().getTime()) > 2 * 3600e3) {
+        // The service caches for 15 minutes, so a forecast this old is the last good one, served because live data failed.
+        var age = Math.round((Date.now() - genDate().getTime()) / 3600e3);
+        sample.hidden = false;
+        sample.textContent = 'This forecast was made ' + hoursWord(age) + ' ago. The live fire and wind data could not be reached, so this is the last forecast that worked.';
       } else sample.hidden = true;
     }
 

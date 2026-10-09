@@ -4,9 +4,10 @@ Seat C owns this file. It does three jobs:
 
 1. Serves the map page (static/index.html) and its files.
 2. Serves the four JSON endpoints from AGENTS.md section 5.
-3. Calls the pipeline built by seats A and B, caches the result for 15 minutes,
-   and falls back to clearly labelled SAMPLE DATA if the pipeline is not ready
-   or fails, so the page always has something honest to show.
+3. Calls the pipeline built by seats A and B and caches the result for 15 minutes.
+   If a live fetch fails it serves the last good forecast (AGENTS.md section 12,
+   trap 10). Only if there has never been a good forecast does it fall back to
+   clearly labelled SAMPLE DATA, so the page always has something honest to show.
 
 Run locally:  .venv\\Scripts\\uvicorn app.main:app --port 8000
 Lambda entry: app.main.handler
@@ -18,6 +19,7 @@ import copy
 import inspect
 import json
 import logging
+import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -41,12 +43,16 @@ TOP_CELLS_CAP = 60  # section 5: top_cells is capped at 60
 ARRIVALS_CAP = 12   # section 5: arrivals is capped at 12 per city
 SAMPLE_PREFIX = "SAMPLE DATA"
 
+# Last good live forecast, kept on disk so it survives a restart. Lambda only lets us write
+# to the temp directory, so that is where it goes. It also lives in memory (_cache["last_good"]).
+LAST_GOOD_FILE = Path(tempfile.gettempdir()) / "smoke-arrival-last-good.json"
+
 app = FastAPI(title="Smoke Arrival", version="0.1.0")
 
 # ---------------------------------------------------------------------------
 # Cache: one forecast, reused for CACHE_TTL_SECONDS (15 minutes).
 # ---------------------------------------------------------------------------
-_cache: dict = {"at": 0.0, "value": None}
+_cache: dict = {"at": 0.0, "value": None, "last_good": None}
 _lock = asyncio.Lock()
 
 
@@ -143,12 +149,41 @@ async def _live_forecast() -> dict:
     }
 
 
-async def _build_forecast() -> dict:
+def _save_last_good(doc: dict) -> None:
+    """Keep the newest successful live forecast in memory and on disk. Never raises."""
+    _cache["last_good"] = doc
     try:
-        return await _live_forecast()
-    except Exception as exc:  # noqa: BLE001  any failure must degrade to the labelled sample
-        log.warning("Live forecast unavailable, serving SAMPLE DATA: %r", exc)
+        tmp = LAST_GOOD_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(doc), encoding="utf-8")
+        tmp.replace(LAST_GOOD_FILE)  # swap in one step so a reader never sees half a file
+    except OSError as exc:
+        log.warning("Could not save the last good forecast: %r", exc)
+
+
+def _load_last_good() -> dict | None:
+    """The last successful live forecast: memory first, then the file. None if there never was one."""
+    if _cache["last_good"] is not None:
+        return _cache["last_good"]
+    try:
+        return json.loads(LAST_GOOD_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+async def _build_forecast() -> dict:
+    """Live forecast, else the last good one, else labelled sample data. The page never sees an error."""
+    try:
+        doc = await _live_forecast()
+    except Exception as exc:  # noqa: BLE001  any failure must degrade, never reach the visitor
+        stale = _load_last_good()
+        if stale is not None:
+            log.warning("Live forecast unavailable, serving the last good forecast from %s: %r",
+                        stale.get("generated_at"), exc)
+            return stale
+        log.warning("Live forecast unavailable and no earlier forecast exists, serving SAMPLE DATA: %r", exc)
         return _sample_forecast()
+    _save_last_good(doc)
+    return doc
 
 
 async def get_forecast() -> dict:
