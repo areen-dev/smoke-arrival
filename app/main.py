@@ -241,5 +241,6 @@ async def index() -> FileResponse:
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# AWS Lambda entry point (seat D sets the handler to app.main.handler).
+# AWS Lambda entry point (seat A sets the handler to app.main.handler).
 handler = Mangum(app, lifespan="off")
+
