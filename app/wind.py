@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date as calendar_date, datetime
 from typing import Any
 
 import httpx
 import numpy as np
 
-from .config import WIND
+from .config import ARCHIVE_ENDPOINT, WIND
 
 
 def _bracket(coordinates: list[float], value: float) -> tuple[int, int, float]:
@@ -132,3 +132,57 @@ def fetch_wind_grid() -> dict[str, Any]:
         "points": point_count,
         "hours": len(times),
     }
+
+
+def fetch_wind_grid_archive(date: str) -> dict[str, Any]:
+    """Fetch one historical day on the same hourly grid as ``fetch_wind_grid``."""
+    try:
+        day = calendar_date.fromisoformat(date).isoformat()
+    except (TypeError, ValueError) as exc:
+        raise ValueError("date must be in YYYY-MM-DD format") from exc
+    if day != date:
+        raise ValueError("date must be in YYYY-MM-DD format")
+
+    lats = list(WIND["grid_lats"])
+    lons = list(WIND["grid_lons"])
+    point_count = len(lats) * len(lons)
+    params = {
+        "latitude": ",".join(map(str, [lat for lat in lats for _ in lons])),
+        "longitude": ",".join(map(str, lons * len(lats))),
+        "hourly": "wind_speed_10m,wind_direction_10m",
+        "wind_speed_unit": "ms",
+        "start_date": day,
+        "end_date": day,
+        "timezone": "UTC",
+    }
+    response = httpx.get(ARCHIVE_ENDPOINT, params=params, timeout=60.0)
+    response.raise_for_status()
+    locations = _as_location_list(response.json(), point_count)
+
+    times = locations[0]["hourly"]["time"]
+    shape = (len(times), len(lats), len(lons))
+    speed = np.empty(shape, dtype=float)
+    direction = np.empty(shape, dtype=float)
+    for point_index, location in enumerate(locations):
+        row, col = divmod(point_index, len(lons))
+        hourly = location["hourly"]
+        if hourly["time"] != times:
+            raise ValueError("Open-Meteo returned inconsistent hourly timestamps")
+        speed[:, row, col] = np.asarray(hourly["wind_speed_10m"], dtype=float)
+        direction[:, row, col] = np.asarray(hourly["wind_direction_10m"], dtype=float)
+
+    radians = np.deg2rad(direction)
+    u = -speed * np.sin(radians)
+    v = -speed * np.cos(radians)
+    parsed_times = [datetime.fromisoformat(value).replace(tzinfo=None) for value in times]
+    return {
+        "lats": lats,
+        "lons": lons,
+        "times": parsed_times,
+        "u": u,
+        "v": v,
+        "height_m": int(WIND["height_m"]),
+        "points": point_count,
+        "hours": len(times),
+    }
+
