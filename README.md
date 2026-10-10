@@ -1,12 +1,19 @@
 # Smoke Arrival
 
-Forecasts **when** crop-residue burning smoke reaches a city, as a time
-rather than a colour on a map.
+Forecasts **when** crop-residue burning smoke reaches a city, as a time rather
+than a colour on a map.
+
+![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![AWS Lambda](https://img.shields.io/badge/AWS%20Lambda-ap--south--1-FF9900?logo=awslambda&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-18%20passing-4f9a8c)
+
+**Live:** https://vslqqybf76ffiznakyjwbdj5qi0adzkw.lambda-url.ap-south-1.on.aws/
+
+![Smoke Arrival](docs/screenshot.png)
 
 Built for Environmental Hacks (WeMakeDevs × AWS, 8-11 October 2026), Track: Air.
 Team of three.
-
-**Live:** https://vslqqybf76ffiznakyjwbdj5qi0adzkw.lambda-url.ap-south-1.on.aws/
 
 ## The problem
 
@@ -18,16 +25,16 @@ for a four-hour window."
 
 ## What it does
 
-Takes public satellite fire detections (NASA FIRMS) and wind (Open-Meteo
-forecast, or the archive for a past date), carries every burning area forward
-through the wind field, and reports per city:
-
-- **when** smoke arrives: a clock time and hours from now
-- **the path** it took to get there, drawn on the map
-- **a relative 0-100 smoke-load index**, ranked between cities
-
-Plus the fires themselves, sized by intensity, so the cause and the effect sit
-on one screen.
+- **Arrival times, not colours.** Each city gets a clock time for first smoke,
+  and hours from now.
+- **The path on the map.** Every contributing fire cell is drawn with the route
+  the wind carries its smoke.
+- **A relative 0-100 smoke-load index** per city, so two cities on the same day
+  can be compared.
+- **The fires themselves**, sized by intensity, so cause and effect sit on one
+  screen.
+- **A hindcast.** The same pipeline replays a past date, for the days when the
+  burning was bad.
 
 ## How it works
 
@@ -42,6 +49,40 @@ on one screen.
    weights each arrival by fire power and by how far it travelled.
 5. One JSON document comes out of the API; the page renders it.
 
+## Quickstart
+
+```bash
+uv venv --python 3.13 .venv
+uv pip install --python .venv/bin/python -r requirements.txt
+
+.venv/bin/uvicorn app.main:app --port 8000     # then open http://localhost:8000
+.venv/bin/python -m pytest tests -q            # 18 tests, no network needed
+```
+
+The live pipeline needs no API keys. Only the hindcast needs a free
+`FIRMS_MAP_KEY` in the environment.
+
+## The hindcast
+
+```bash
+.venv/bin/python scripts/hindcast.py 2025-11-05
+```
+
+Today may be a quiet day. This replays a day when the burning was bad, which is
+the event the tool exists for.
+
+## API
+
+| Endpoint | Returns |
+| --- | --- |
+| `GET /health` | liveness check |
+| `GET /api/cities` | the eight cities, with coordinates and arrival radii |
+| `GET /api/forecast` | the full document: fires, wind, cities, arrivals, paths |
+| `GET /api/forecast/{city}` | one city's block |
+
+Responses are cached for 15 minutes, and the service falls back to the last
+good response rather than failing.
+
 ## Reading the output honestly
 
 - The index is **relative, not a concentration**. It ranks cities and days
@@ -52,16 +93,16 @@ on one screen.
 - On a calm day the page says *clear* everywhere. That is the correct answer,
   not a bug.
 
-## The hindcast
+## Who built what
 
-The same pipeline replays a past date:
+| Person | Built | AI assistant |
+| --- | --- | --- |
+| **Sagar** (seat A) | FIRMS ingestion across four sensors, with de-duplication and confidence filtering. Live and archived wind. The Lambda bundle, the Function URL and the deploy. | Codex |
+| **Areen** (seat B) | The transport model: grid clustering, advection, arrival detection, the 0-100 index. The 18 tests. The hindcast replay. Integration and this writeup. | Hermes |
+| **Ayesha** (seat C) | The FastAPI service with a 15-minute cache and a last-good fallback. The map page, the city board and the 48-hour arrival ruler. | Claude |
 
-```bash
-.venv/bin/python scripts/hindcast.py 2025-11-05
-```
-
-That matters because today may be a quiet day. The hindcast shows the model on
-a day when the burning was bad, which is the event the tool exists for.
+Every member used an AI assistant, disclosed above as the event rules require.
+The repository history shows who committed what.
 
 ## Where AWS fits
 
@@ -73,26 +114,6 @@ build machine.
 
 Chosen because it is the smallest thing that satisfies "deployed on AWS" and
 it stays inside the always-free tier. CloudWatch collects the logs.
-
-## Run locally
-
-```bash
-uv venv --python 3.13 .venv
-uv pip install --python .venv/bin/python -r requirements.txt
-.venv/bin/uvicorn app.main:app --port 8000     # then open http://localhost:8000
-.venv/bin/python -m pytest tests -q            # 18 tests, no network needed
-```
-
-The historical FIRMS API needs a free `FIRMS_MAP_KEY` in the environment. The
-live pipeline needs no keys at all.
-
-## Status
-
-Deployed and running on AWS Lambda (`ap-south-1`) behind a Function URL:
-https://vslqqybf76ffiznakyjwbdj5qi0adzkw.lambda-url.ap-south-1.on.aws/
-
-The pipeline runs end to end on live data: fires in, wind in, arrivals out,
-served by the API and rendered by the page. The 18 model tests pass.
 
 ## Cost
 
@@ -107,17 +128,6 @@ queue, no storage, so nothing else is billed.
 - FastAPI (MIT), Mangum (MIT), httpx (BSD-3-Clause), numpy (BSD-3-Clause)
 - Fire data: NASA FIRMS (open data, attribution requested)
 - Wind: Open-Meteo (CC BY 4.0, attribution required)
-
-## AI tools used
-
-Disclosed as the event rules require. Every member used an assistant, and each
-is named here.
-
-- **Seat A, data and deploy (Sagar):** Codex, by OpenAI. Ingestion modules,
-  the archive fetchers, Lambda packaging and the deploy.
-- **Seat B, model, integration, writeup (Areen):** Hermes, by Nous Research.
-  Code, tests, review, and this document.
-- **Seat C, API and page (Ayesha):** Claude.
 
 ## Repository history
 
