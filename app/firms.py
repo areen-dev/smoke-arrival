@@ -130,7 +130,7 @@ def _fetch_archive_sensor(
 
 
 def fetch_fires_archive(date: str) -> list[Fire]:
-    """Fetch and merge one historical day of FIRMS Standard Processing data.
+    """Fetch and merge one historical day of FIRMS archive data.
 
     A free NASA FIRMS MAP_KEY must be provided in the ``FIRMS_MAP_KEY``
     environment variable. The key is read at runtime and is never stored here.
@@ -156,7 +156,8 @@ def fetch_fires_archive(date: str) -> list[Fire]:
     sources = {
         "viirs_npp": "VIIRS_SNPP_SP",
         "viirs_noaa20": "VIIRS_NOAA20_SP",
-        "viirs_noaa21": "VIIRS_NOAA21_SP",
+        # FIRMS exposes NOAA-21 archive data as NRT; it has no NOAA21_SP source.
+        "viirs_noaa21": "VIIRS_NOAA21_NRT",
         "modis": "MODIS_SP",
     }
     with httpx.Client(timeout=60.0, follow_redirects=True) as client:
@@ -176,5 +177,6 @@ def in_source_region(fires: Iterable[Fire]) -> list[Fire]:
         if SOURCE_BBOX["min_lat"] <= fire.lat <= SOURCE_BBOX["max_lat"]
         and SOURCE_BBOX["min_lon"] <= fire.lon <= SOURCE_BBOX["max_lon"]
     ]
+
 
 
