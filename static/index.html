@@ -54,11 +54,14 @@
   .mapwrap { position: relative; min-height: 0; background: #dfe5e7; }
   #map { position: absolute; inset: 0; background: #dfe5e7; }
   .legend {
-    position: absolute; left: 12px; bottom: 26px; z-index: 500; max-width: min(360px, calc(100% - 24px));
+    position: absolute; left: 12px; bottom: 26px; z-index: 500; max-width: min(410px, calc(100% - 24px));
     background: rgba(248, 249, 248, .94); border: 1px solid var(--line); border-radius: 6px;
     padding: 8px 10px; font-size: 13px; color: var(--muted); pointer-events: none;
   }
   .legend b { color: var(--ink); font-weight: 600; }
+  .key { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+  .key span { display: inline-flex; align-items: center; gap: 4px; }
+  .key span::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--c); border: 1.5px solid var(--ink); box-sizing: border-box; }
   .legend i {
     display: inline-block; width: 10px; height: 10px; border-radius: 50%;
     background: var(--ember); opacity: .8; vertical-align: -1px; margin-right: 4px;
@@ -170,11 +173,13 @@
   <div class="main">
     <section class="mapwrap" aria-label="Map of fires and forecast smoke paths">
       <div id="map" role="img" aria-label="Map showing satellite-detected fires and the paths smoke is forecast to take toward the selected city"></div>
-      <div class="legend"><i></i><b>Orange circles</b> are fires seen by satellite in the last 24 hours; larger means hotter. <b>Lines</b> show where the wind carries their smoke.</div>
+      <div class="legend"><i></i><b>Orange circles</b> are fires seen by satellite in the last 24 hours; larger means hotter. <b>Lines</b> show where the wind carries their smoke.
+        <div class="key" id="key" aria-label="City colour key"><b>City colour</b></div>
+      </div>
     </section>
 
     <aside class="panel" id="panel" aria-live="polite">
-      <div class="msg"><h2>Loading forecast</h2><p>Fetching fire detections and wind.</p></div>
+      <div class="msg"><h2>Loading forecast</h2><p>Fetching fire detections and wind. This usually takes under 30 seconds, then the forecast is kept for 15 minutes.</p></div>
     </aside>
   </div>
 
@@ -289,11 +294,18 @@
     /* ---------- map ---------- */
     function initMap() {
       L.Icon.Default.imagePath = '/static/vendor/leaflet/images/';
-      map = L.map('map', { minZoom: 5, maxZoom: 10, zoomSnap: 0.5 }).setView([29.6, 76.6], 7);
+      map = L.map('map', { minZoom: 5, maxZoom: 10, zoomSnap: 0.5, preferCanvas: true }).setView([29.6, 76.6], 7);
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
+      var key = document.getElementById('key');
+      ['clear', 'low', 'moderate', 'high', 'severe'].forEach(function (b) {
+        var s = document.createElement('span');
+        s.style.setProperty('--c', COLORS[b]);
+        s.textContent = b;
+        key.appendChild(s);
+      });
       fireLayer = L.layerGroup().addTo(map);
       ringLayer = L.layerGroup().addTo(map);
       pathLayer = L.layerGroup().addTo(map);
@@ -306,8 +318,8 @@
       cells.forEach(function (c) {
         var r = Math.min(3 + 1.15 * Math.sqrt(c.frp), 20);
         L.circleMarker([c.lat, c.lon], { radius: r, stroke: true, color: '#b8381a', weight: 1, fillColor: '#e4572e', fillOpacity: 0.5 })
-          .bindTooltip('Fire cluster near ' + c.lat.toFixed(2) + '°N, ' + c.lon.toFixed(2) + '°E<br>' +
-            Math.round(c.frp) + ' MW fire power, ' + c.detections + ' detections<br>latest ' + c.newest + ' UTC')
+          .bindTooltip('<b>' + Math.round(c.frp) + ' MW</b> fire power, ' + c.detections + ' detections<br>' +
+            'Fire cluster near ' + c.lat.toFixed(2) + '°N, ' + c.lon.toFixed(2) + '°E<br>latest ' + c.newest + ' UTC')
           .addTo(fireLayer);
       });
     }
