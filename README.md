@@ -1,16 +1,16 @@
 # Smoke Arrival
 
-Forecasts **when** crop-residue burning smoke reaches a city — as a time,
-not a colour on a map.
+Forecasts **when** crop-residue burning smoke reaches a city, as a time
+rather than a colour on a map.
 
-Built for Environmental Hacks (WeMakeDevs × AWS, 8–11 October 2026), Track: Air.
+Built for Environmental Hacks (WeMakeDevs × AWS, 8-11 October 2026), Track: Air.
 Team of three.
 
 ## The problem
 
 Every October, farmers in Punjab and Haryana burn paddy residue. Delhi sits
-250–400 km downwind and breathes it. Existing tools report air quality
-**after** the smoke has arrived. They measure; they do not forecast. Nobody
+250-400 km downwind and breathes it. Existing tools report air quality
+**after** the smoke has arrived. They measure, they do not forecast. Nobody
 can tell a school or someone with asthma: "smoke reaches you at 7pm tomorrow,
 for a four-hour window."
 
@@ -20,9 +20,9 @@ Takes public satellite fire detections (NASA FIRMS) and wind (Open-Meteo
 forecast, or the archive for a past date), carries every burning area forward
 through the wind field, and reports per city:
 
-- **when** smoke arrives — a clock time and hours from now
+- **when** smoke arrives: a clock time and hours from now
 - **the path** it took to get there, drawn on the map
-- **a relative 0–100 smoke-load index**, ranked between cities
+- **a relative 0-100 smoke-load index**, ranked between cities
 
 Plus the fires themselves, sized by intensity, so the cause and the effect sit
 on one screen.
@@ -32,8 +32,8 @@ on one screen.
 1. Four FIRMS sensors are downloaded, merged, de-duplicated, and snapped to
    0.25° cells. Each cell becomes one source, carrying the summed fire
    radiative power of every detection inside it.
-2. Hourly wind on a 5×6 grid is fetched and converted to u/v components
-   (direction is where wind blows *from*, so the sign flips).
+2. Hourly wind on a 5×6 grid is fetched and converted to u/v components.
+   Direction is where the wind blows *from*, so the sign flips.
 3. Every source is carried forward through the wind in 1-hour steps, up to
    48 hours. Smoke thins with distance as it travels.
 4. **Arrival** is the first hour a particle enters a city's radius. The index
@@ -59,13 +59,13 @@ The same pipeline replays a past date:
 ```
 
 That matters because today may be a quiet day. The hindcast shows the model on
-a day when the burning was bad — the event the tool exists for.
+a day when the burning was bad, which is the event the tool exists for.
 
 ## Where AWS fits
 
 FastAPI served by **AWS Lambda behind a Function URL**, region `ap-south-1`,
 via Mangum. One function, one URL, no containers. The bundle is built for
-Lambda's platform — `x86_64` manylinux wheels, Python 3.13 — by
+Lambda's platform (`x86_64` manylinux wheels, Python 3.13) by
 `scripts/package_lambda.sh`, so the deploy cannot silently depend on the
 build machine.
 
@@ -94,31 +94,31 @@ deploy to Lambda is the remaining step.
 
 Runs inside the AWS Free Tier. Lambda gives 1 million requests and 400,000
 GB-seconds of compute per month, and CloudWatch gives 10 custom metrics and
-10 alarms — both always-free allowances, not a trial. No database, no queue,
-no storage, so nothing else is billed.
+10 alarms. Both are always-free allowances, not a trial. No database, no
+queue, no storage, so nothing else is billed.
 
 ## Credits and licences
 
-- Leaflet 1.9.4 — BSD 2-Clause, vendored at `static/vendor/leaflet/`
+- Leaflet 1.9.4 (BSD 2-Clause), vendored at `static/vendor/leaflet/`
 - FastAPI (MIT), Mangum (MIT), httpx (BSD-3-Clause), numpy (BSD-3-Clause)
-- Fire data: NASA FIRMS — open data, attribution requested
-- Wind: Open-Meteo — CC BY 4.0, attribution required
+- Fire data: NASA FIRMS (open data, attribution requested)
+- Wind: Open-Meteo (CC BY 4.0, attribution required)
 
 ## AI tools used
 
 Disclosed as the event rules require. Every member used an assistant, and each
 is named here.
 
-- **Seat A — data and deploy (Sagar):** Codex, by OpenAI — ingestion modules,
-  the archive fetchers, Lambda packaging and the deploy
-- **Seat B — model, integration, writeup (Areen):** Hermes, by Nous Research —
-  code, tests, review, and this document
-- **Seat C — API and page (Ayesha):** Claude
+- **Seat A, data and deploy (Sagar):** Codex, by OpenAI. Ingestion modules,
+  the archive fetchers, Lambda packaging and the deploy.
+- **Seat B, model, integration, writeup (Areen):** Hermes, by Nous Research.
+  Code, tests, review, and this document.
+- **Seat C, API and page (Ayesha):** Claude.
 
 ## Repository history
 
-Every commit falls inside the event window, 8–11 October 2026.
+Every commit falls inside the event window, 8-11 October 2026.
 
 ## Demo video
 
-<!-- paste the YouTube link here before submitting — must show AWS -->
+<!-- paste the YouTube link here before submitting; it must show AWS -->
