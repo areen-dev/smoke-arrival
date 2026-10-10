@@ -6,6 +6,8 @@ rather than a colour on a map.
 Built for Environmental Hacks (WeMakeDevs × AWS, 8-11 October 2026), Track: Air.
 Team of three.
 
+**Live:** https://vslqqybf76ffiznakyjwbdj5qi0adzkw.lambda-url.ap-south-1.on.aws/
+
 ## The problem
 
 Every October, farmers in Punjab and Haryana burn paddy residue. Delhi sits
@@ -86,9 +88,11 @@ live pipeline needs no keys at all.
 
 ## Status
 
+Deployed and running on AWS Lambda (`ap-south-1`) behind a Function URL:
+https://vslqqybf76ffiznakyjwbdj5qi0adzkw.lambda-url.ap-south-1.on.aws/
+
 The pipeline runs end to end on live data: fires in, wind in, arrivals out,
-served by the API and rendered by the page. The 18 model tests pass. The
-deploy to Lambda is the remaining step.
+served by the API and rendered by the page. The 18 model tests pass.
 
 ## Cost
 
