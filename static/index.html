@@ -461,7 +461,7 @@
         stats.push(h('div', null, h('dt', null, 'Burning inside the city area'),
           h('dd', null, c.local_fire_cells, ' ', h('small', null, 'counted separately'))));
       }
-      stats.push(h('div', null, h('dt', null, 'Nearest fire cluster'), h('dd', null, Math.round(c.nearest_source_km), ' ', h('small', null, 'km'))));
+      if (c.nearest_source_km != null) stats.push(h('div', null, h('dt', null, 'Nearest fire cluster'), h('dd', null, Math.round(c.nearest_source_km), ' ', h('small', null, 'km'))));
       kids.push(h('dl', { class: 'stats' }, stats));
 
       if (c.arrivals.length) {
