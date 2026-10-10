@@ -128,6 +128,8 @@ queue, no storage, so nothing else is billed.
 - Fire data: NASA FIRMS (open data, attribution requested)
 - Wind: Open-Meteo (CC BY 4.0, attribution required)
 
+Our own code is released under the MIT licence, in `LICENSE`.
+
 ## Repository history
 
 Every commit falls inside the event window, 8-11 October 2026.
