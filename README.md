@@ -97,11 +97,12 @@ good response rather than failing.
 
 | Person | Built | AI assistant |
 | --- | --- | --- |
-| **Sagar** (seat A) | FIRMS ingestion across four sensors, with de-duplication and confidence filtering. Live and archived wind. The Lambda bundle, the Function URL and the deploy. | Codex |
-| **Areen** (seat B) | The transport model: grid clustering, advection, arrival detection, the 0-100 index. The 18 tests. The hindcast replay. Integration and this writeup. | Hermes |
-| **Ayesha** (seat C) | The FastAPI service with a 15-minute cache and a last-good fallback. The map page, the city board and the 48-hour arrival ruler. | Claude |
+| **Sagar** (seat A) | FIRMS ingestion across four sensors, with de-duplication and confidence filtering. Live and archived wind. The Lambda bundle, the Function URL and the deploy. | <img src="docs/logos/openai.svg" height="16" alt="OpenAI"> Codex, by OpenAI |
+| **Areen** (seat B) | The transport model: grid clustering, advection, arrival detection, the 0-100 index. The 18 tests. The hindcast replay. Integration and this writeup. | <img src="docs/logos/nousresearch.svg" height="16" alt="Nous Research"> Hermes, by Nous Research |
+| **Ayesha** (seat C) | The FastAPI service with a 15-minute cache and a last-good fallback. The map page, the city board and the 48-hour arrival ruler. | <img src="docs/logos/anthropic.svg" height="16" alt="Anthropic"> Claude, by Anthropic |
 
 Every member used an AI assistant, disclosed above as the event rules require.
+Product names and logos belong to their respective owners.
 
 ## Where AWS fits
 
