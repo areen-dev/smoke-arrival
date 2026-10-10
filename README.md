@@ -102,7 +102,6 @@ good response rather than failing.
 | **Ayesha** (seat C) | The FastAPI service with a 15-minute cache and a last-good fallback. The map page, the city board and the 48-hour arrival ruler. | Claude |
 
 Every member used an AI assistant, disclosed above as the event rules require.
-The repository history shows who committed what.
 
 ## Where AWS fits
 
