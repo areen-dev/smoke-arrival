@@ -16,6 +16,7 @@ uv pip install --target "$tmp_dir" \
   --python-version 3.13 \
   -r requirements.txt
 cp -R app "$tmp_dir/app"
+cp -R static "$tmp_dir/static"
 (cd "$tmp_dir" && zip -qr "$repo_root/bundle.zip" . -x '*/__pycache__/*')
 
 echo "Created $repo_root/bundle.zip"
