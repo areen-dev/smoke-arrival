@@ -382,6 +382,7 @@ uv pip install --target ./build \
   --python-platform x86_64-manylinux2014 --python-version 3.13 \
   -r requirements.txt
 cp -r app build/app
+cp -r static build/static
 (cd build && zip -qr ../bundle.zip . -x "*/__pycache__/*")
 
 # 2. deploy
