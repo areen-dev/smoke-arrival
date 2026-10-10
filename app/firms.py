@@ -5,8 +5,11 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import csv
+from datetime import date as calendar_date
 from io import StringIO
+import os
 from typing import Iterable
+from urllib.parse import quote
 
 import httpx
 
@@ -32,7 +35,10 @@ def _confidence_allowed(sensor: str, confidence: str | int | float) -> bool:
             return float(confidence) >= float(FIRMS["modis_min_confidence"])
         except (TypeError, ValueError):
             return False
-    return str(confidence).strip().lower() in FIRMS["keep_confidence"]
+    value = str(confidence).strip().lower()
+    # Standard Processing archive CSVs use single-letter confidence codes.
+    value = {"l": "low", "n": "nominal", "h": "high"}.get(value, value)
+    return value in FIRMS["keep_confidence"]
 
 
 def _parse_csv(text: str, sensor: str) -> list[Fire]:
@@ -44,6 +50,10 @@ def _parse_csv(text: str, sensor: str) -> list[Fire]:
 
     for row in reader:
         confidence: str | int | float = (row.get("confidence") or "").strip()
+        if sensor != "modis":
+            confidence = {"l": "low", "n": "nominal", "h": "high"}.get(
+                str(confidence).lower(), confidence
+            )
         if not _confidence_allowed(sensor, confidence):
             continue
         try:
@@ -107,6 +117,58 @@ def fetch_fires(window: str | None = None) -> list[Fire]:
     return _deduplicate(records)
 
 
+def _fetch_archive_sensor(
+    client: httpx.Client, sensor: str, source: str, area: str, day: str, map_key: str
+) -> list[Fire]:
+    url = (
+        "https://firms.modaps.eosdis.nasa.gov/api/area/csv/"
+        f"{quote(map_key, safe='')}/{source}/{area}/1/{day}"
+    )
+    response = client.get(url)
+    response.raise_for_status()
+    return _parse_csv(response.text, sensor)
+
+
+def fetch_fires_archive(date: str) -> list[Fire]:
+    """Fetch and merge one historical day of FIRMS Standard Processing data.
+
+    A free NASA FIRMS MAP_KEY must be provided in the ``FIRMS_MAP_KEY``
+    environment variable. The key is read at runtime and is never stored here.
+    """
+    try:
+        day = calendar_date.fromisoformat(date).isoformat()
+    except (TypeError, ValueError) as exc:
+        raise ValueError("date must be in YYYY-MM-DD format") from exc
+    if day != date:
+        raise ValueError("date must be in YYYY-MM-DD format")
+
+    map_key = os.environ.get("FIRMS_MAP_KEY", "").strip()
+    if not map_key:
+        raise RuntimeError(
+            "Set FIRMS_MAP_KEY in the environment to use historical FIRMS data"
+        )
+
+    # Archive products cover the same source region used by the live feeds.
+    area = ",".join(
+        str(SOURCE_BBOX[key])
+        for key in ("min_lon", "min_lat", "max_lon", "max_lat")
+    )
+    sources = {
+        "viirs_npp": "VIIRS_SNPP_SP",
+        "viirs_noaa20": "VIIRS_NOAA20_SP",
+        "viirs_noaa21": "VIIRS_NOAA21_SP",
+        "modis": "MODIS_SP",
+    }
+    with httpx.Client(timeout=60.0, follow_redirects=True) as client:
+        with ThreadPoolExecutor(max_workers=len(sources)) as pool:
+            futures = [
+                pool.submit(_fetch_archive_sensor, client, sensor, source, area, day, map_key)
+                for sensor, source in sources.items()
+            ]
+            records = [fire for future in futures for fire in future.result()]
+    return _deduplicate(records)
+
+
 def in_source_region(fires: Iterable[Fire]) -> list[Fire]:
     """Keep detections inside the configured Punjab/Haryana source box."""
     return [
@@ -114,4 +176,5 @@ def in_source_region(fires: Iterable[Fire]) -> list[Fire]:
         if SOURCE_BBOX["min_lat"] <= fire.lat <= SOURCE_BBOX["max_lat"]
         and SOURCE_BBOX["min_lon"] <= fire.lon <= SOURCE_BBOX["max_lon"]
     ]
+
 
