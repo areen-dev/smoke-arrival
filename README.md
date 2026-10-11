@@ -137,4 +137,7 @@ Every commit falls inside the event window, 8-11 October 2026.
 
 ## Demo video
 
-<!-- paste the YouTube link here before submitting; it must show AWS -->
+https://youtu.be/62iqW-hUZaA
+
+Three minutes. Shows the live app running on AWS, the hindcast replay of
+5 November 2025, and the Lambda console behind it.
