@@ -598,33 +598,42 @@ Each step is tested before the next one depends on it.
 
 ---
 
-## 16. Current state — resume point
+## 16. Current state - resume point
 
-**Nothing is implemented yet.** The repository contains only the skeleton:
-this file, `requirements.txt`, `.gitignore`, `README.md`, `app/config.py`
-(the shared constants), and the vendored Leaflet library. **Every line of
-project code is written inside the event window**, 8–11 October.
+**Everything is implemented, deployed and verified.** As of Sunday
+11 October, 15:30 IST:
 
-The notes below are pre-event planning. The rulebook explicitly allows this:
-*"Learning, planning and practice before it starts are fine, and we encourage
-them."* They are notes about what is reachable and what works — not code we
-are reusing. The team lead has written to the organisers to confirm that
-reading. If anyone asks you whether work happened before the event, describe
-it exactly like this and no differently.
+- **Seat A:** `app/firms.py` and `app/wind.py` (live and archived fetchers),
+  `scripts/package_lambda.sh`, the Lambda bundle and the deploy.
+- **Seat B:** `app/model.py` with clustering, advection, arrivals and the
+  index; 18 tests passing; `scripts/hindcast.py`; the README writeup.
+- **Seat C:** `app/main.py` and `static/index.html`, with a 15-minute cache
+  and a last-good fallback.
+
+Live: https://vslqqybf76ffiznakyjwbdj5qi0adzkw.lambda-url.ap-south-1.on.aws/
 
 Verified, so nobody re-checks it:
 
-- All four FIRMS CSVs and both Open-Meteo endpoints are reachable with no
-  key. A live run on 8 October produced 3,202 detections across the belt,
-  clustering to 71 source cells with a total FRP of 1,966.
-- A FastAPI app wrapped in Mangum survives Lambda's packaging: the handler
-  resolves and returns HTTP 200 when driven with a realistic Function URL
-  event. Bundle: 12 MB zipped, about 1,650 files.
-- Leaflet 1.9.4 is vendored and verified: js, css, five images and its
-  BSD 2-Clause LICENSE, 188 KB total, with no CDN references inside it.
-- Lambda Function URLs are available in `ap-south-1` at no extra cost.
+- The live pipeline on 10 October turned 3,826 detections into 76 cells;
+  every endpoint returned 200 and the page rendered the map, the city board
+  and the 48-hour ruler.
+- `pytest tests -q` gives 18 passed, with no network needed.
+- The hindcast replay of 5 November 2025: 1,707 detections, 161 cells,
+  arrivals in all eight cities. It needs `FIRMS_MAP_KEY` in the environment.
+- The bundle is built for Lambda's platform (`x86_64`, Python 3.13) and is
+  deployed to `ap-south-1`.
 
-**First thing everyone does:** make sure you have your own WeMakeDevs
-account and check-in, your own AWS Builder Center student verification, and
-your own AWS Free Tier account if you are deploying. The questions at the
-top of this file are the checklist.
+Still open:
+
+- The demo video (seat B), and its link in the README.
+- The submission itself: public repo, video under three minutes, writeup.
+
+Pre-event planning, disclosed: learning and planning before the event are
+explicitly allowed, and the planning notes that used to sit here checked that
+the data sources were reachable and that Lambda packaging worked. **Every
+line of project code was written inside the event window**, 8-11 October. If
+anyone asks whether work happened before the event, describe it exactly like
+this and no differently.
+
+**Each member's own side:** WeMakeDevs account and check-in, AWS Builder
+Center student verification, and an AWS Free Tier account if deploying.
